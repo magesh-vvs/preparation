@@ -13,13 +13,16 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/magesh-vvs/preparation.git'
+                 script{
+                        dir("terraform")
+                            {
+                            git branch: 'main', url: 'https://github.com/magesh-vvs/preparation.git'
             }
         }
 
         stage('Plan') {
             steps {
-                powershell '''
+                sh '''
                     cd terraform
                     terraform init
                     terraform plan -out tfplan
@@ -45,7 +48,7 @@ pipeline {
 
         stage('Apply') {
             steps {
-                powershell '''
+                sh '''
                     cd terraform
                     terraform apply -input=false tfplan
                 '''
@@ -53,5 +56,6 @@ pipeline {
         }
     }
 }
+
 
 
