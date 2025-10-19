@@ -17,7 +17,6 @@ pipeline {
                         {
                             https://github.com/magesh-vvs/preparation.git"
                         }
-                    }
                 }
             }
 
