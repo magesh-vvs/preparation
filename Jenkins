@@ -13,7 +13,7 @@ pipeline {
         stage('checkout') {
             steps {
                  script{
-                        dir("terraform")
+                       
                         {
                             https://github.com/magesh-vvs/preparation.git"
                         }
