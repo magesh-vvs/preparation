@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
+        booleanParam(name: 'AUTO_APPROVE', defaultValue: false, description: 'Automatically apply Terraform plan?')
     }
 
     environment {
@@ -13,19 +13,25 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                 script{
-                        dir("terraform")
-                            {
-                            git branch: 'main', url: 'https://github.com/magesh-vvs/preparation.git'
+                echo "Fetching Terraform code from GitHub..."
+                git branch: 'main', url: 'https://github.com/magesh-vvs/preparation.git'
             }
         }
 
-        stage('Plan') {
+        stage('Terraform Init') {
             steps {
                 sh '''
                     cd terraform
-                    terraform init
-                    terraform plan -out tfplan
+                    terraform init -input=false
+                '''
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh '''
+                    cd terraform
+                    terraform plan -out=tfplan
                     terraform show -no-color tfplan > tfplan.txt
                 '''
             }
@@ -34,25 +40,34 @@ pipeline {
         stage('Approval') {
             when {
                 not {
-                    equals expected: true, actual: params.autoApprove
+                    equals expected: true, actual: params.AUTO_APPROVE
                 }
             }
             steps {
                 script {
-                    def plan = readFile 'terraform/tfplan.txt'
-                    input message: "Do you want to apply the plan?",
-                        parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                    def plan = readFile('terraform/tfplan.txt')
+                    input message: "Do you want to apply this Terraform plan?",
+                          parameters: [text(name: 'Plan', description: 'Review the plan below', defaultValue: plan)]
                 }
             }
         }
 
-        stage('Apply') {
+        stage('Terraform Apply') {
             steps {
                 sh '''
                     cd terraform
-                    terraform apply -input=false tfplan
+                    terraform apply -auto-approve -input=false tfplan
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Terraform Apply completed successfully!"
+        }
+        failure {
+            echo "❌ Terraform pipeline failed."
         }
     }
 }
