@@ -2,8 +2,16 @@ pipeline {
     agent any
 
     parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
-        choice(name: 'action', choices: ['apply', 'destroy'], description: 'Select the action to perform')
+        booleanParam(
+            name: 'autoApprove',
+            defaultValue: false,
+            description: 'Automatically run apply after generating plan?'
+        )
+        choice(
+            name: 'action',
+            choices: ['apply', 'destroy'],
+            description: 'Select the Terraform action to perform'
+        )
     }
 
     environment {
@@ -18,37 +26,50 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/magesh-vvs/preparation.git'
             }
         }
-        stage('Terraform init') {
+
+        stage('Terraform Init') {
             steps {
                 bat 'terraform init'
             }
         }
-        stage('Plan') {
+
+        stage('Terraform Plan') {
             steps {
-                bat 'terraform plan -out tfplan'
+                bat 'terraform plan -out=tfplan'
                 bat 'terraform show -no-color tfplan > tfplan.txt'
             }
         }
+
         stage('Apply / Destroy') {
             steps {
                 script {
                     if (params.action == 'apply') {
-                        if (!params.autoApprove) {
+                        if (params.autoApprove) {
+                            echo "Auto-approving Terraform apply..."
+                            bat "terraform apply -auto-approve tfplan"
+                        } else {
                             def plan = readFile 'tfplan.txt'
-                            input message: "Do you want to apply the plan?",
-                            parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                            input message: "Do you want to apply this Terraform plan?",
+                                  parameters: [text(name: 'Plan', description: 'Please review before apply', defaultValue: plan)]
+                            bat "terraform apply -input=false tfplan"
                         }
-
-                        bat 'terraform ${action} -input=false tfplan'
                     } else if (params.action == 'destroy') {
-                        bat 'terraform ${action} --auto-approve'
+                        echo "Destroying Terraform-managed infrastructure..."
+                        bat "terraform destroy --auto-approve"
                     } else {
                         error "Invalid action selected. Please choose either 'apply' or 'destroy'."
                     }
                 }
             }
         }
+    }
 
+    post {
+        success {
+            echo "✅ Terraform ${params.action} completed successfully!"
+        }
+        failure {
+            echo "❌ Terraform ${params.action} failed. Check logs for details."
+        }
     }
 }
-
